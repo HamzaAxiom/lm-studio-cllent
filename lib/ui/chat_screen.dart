@@ -143,7 +143,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           return _buildLoadingBubble().animate().fadeIn();
         }
         final message = messages[index];
-        return _buildMessageBubble(message).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1);
+        return _buildMessageBubble(message, index).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1);
       },
     );
   }
@@ -242,8 +242,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ];
   }
 
-  Widget _buildMessageBubble(ChatMessage message) {
+  Widget _buildMessageBubble(ChatMessage message, int index) {
     final isUser = message.role == MessageRole.user;
+    final isLastMessage = index == ref.read(chatMessagesProvider(ref.read(currentSessionProvider)!.id)).messages.length - 1;
+
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -278,11 +280,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ),
               ),
             ..._buildMessageContent(message),
-            if (!isUser) ...[
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (isUser)
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 16, color: Colors.white24),
+                    onPressed: () => _showEditMessageDialog(context, message.content, index),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Edit',
+                  ),
+                const SizedBox(width: 8),
+                if (!isUser && isLastMessage)
                   IconButton(
                     icon: const Icon(Icons.refresh, size: 16, color: Colors.white24),
                     onPressed: () {
@@ -295,11 +306,55 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     constraints: const BoxConstraints(),
                     tooltip: 'Regenerate',
                   ),
-                ],
-              ),
-            ],
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 16, color: Colors.white24),
+                  onPressed: () {
+                    final currentSession = ref.read(currentSessionProvider);
+                    if (currentSession != null) {
+                      ref.read(chatMessagesProvider(currentSession.id).notifier).deleteMessage(index);
+                    }
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Delete',
+                ),
+              ],
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showEditMessageDialog(BuildContext context, String currentContent, int index) {
+    final controller = TextEditingController(text: currentContent);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Edit Message'),
+        content: TextField(
+          controller: controller,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+          ),
+          style: const TextStyle(color: Colors.white),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final currentSession = ref.read(currentSessionProvider);
+              if (currentSession != null) {
+                ref.read(chatMessagesProvider(currentSession.id).notifier).editMessage(index, controller.text);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
       ),
     );
   }

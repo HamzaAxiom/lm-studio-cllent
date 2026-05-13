@@ -202,6 +202,31 @@ class ChatMessagesNotifier extends StateNotifier<ChatState> {
     }
   }
 
+  Future<void> deleteMessage(int index) async {
+    final updatedMessages = List<ChatMessage>.from(state.messages);
+    updatedMessages.removeAt(index);
+    state = state.copyWith(messages: updatedMessages);
+    _saveToHive();
+  }
+
+  Future<void> editMessage(int index, String newText) async {
+    final updatedMessages = List<ChatMessage>.from(state.messages);
+    final oldMessage = updatedMessages[index];
+    
+    updatedMessages[index] = ChatMessage(
+      content: newText,
+      role: oldMessage.role,
+      timestamp: oldMessage.timestamp,
+      imagePath: oldMessage.imagePath,
+    );
+    
+    state = state.copyWith(messages: updatedMessages);
+    _saveToHive();
+
+    // If it was a user message, we might want to regenerate the following assistant response
+    // But for now, just editing is enough as requested.
+  }
+
   Future<void> regenerateMessage() async {
     if (state.messages.isEmpty) return;
 
