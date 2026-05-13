@@ -437,19 +437,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             final isSelected = session.systemPrompt == entry.value;
             return Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(entry.key),
-                selected: isSelected,
-                onSelected: (selected) {
-                  if (selected) {
-                    ref.read(chatMessagesProvider(session.id).notifier).updateSystemPrompt(entry.value);
-                  }
+              child: GestureDetector(
+                onLongPress: () {
+                  if (entry.key == 'Assistant') return; // Don't delete the only default
+                  _showDeletePersonaDialog(context, entry.key);
                 },
-                backgroundColor: Colors.white.withOpacity(0.05),
-                selectedColor: const Color(0xFF6366F1).withOpacity(0.3),
-                labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : Colors.white60,
-                  fontSize: 12,
+                child: ChoiceChip(
+                  label: Text(entry.key),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected) {
+                      ref.read(chatMessagesProvider(session.id).notifier).updateSystemPrompt(entry.value);
+                    }
+                  },
+                  backgroundColor: Colors.white.withOpacity(0.05),
+                  selectedColor: const Color(0xFF6366F1).withOpacity(0.3),
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white60,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             );
@@ -457,6 +463,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           IconButton(
             icon: const Icon(Icons.add_circle_outline, size: 20, color: Colors.white24),
             onPressed: () => _showAddPersonaDialog(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeletePersonaDialog(BuildContext context, String name) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Delete Persona'),
+        content: Text('Are you sure you want to delete "$name"?', style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(personasProvider.notifier).deletePersona(name);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.withOpacity(0.8)),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

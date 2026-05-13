@@ -30,18 +30,16 @@ class PersonasNotifier extends StateNotifier<Map<String, String>> {
 
   void _loadPersonas() {
     final box = Hive.box('personas');
+    
+    if (box.isEmpty) {
+      // Default persona
+      final defaults = {'Assistant': 'You are a helpful assistant.'};
+      box.putAll(defaults);
+    }
+
     final Map<String, String> loaded = {};
     for (var key in box.keys) {
       loaded[key.toString()] = box.get(key).toString();
-    }
-    
-    if (loaded.isEmpty) {
-      // Default personas
-      loaded['Assistant'] = 'You are a helpful assistant.';
-      loaded['Gen Z'] = 'You are a helpful assistant but you speak in Gen Z slang and use lots of brainrot memes and emojis.';
-      loaded['Expert'] = 'You are a highly technical expert. Give detailed, precise, and professional answers.';
-      loaded['Rhymes'] = 'You answer only in rhymes.';
-      _saveAll(loaded);
     }
     state = loaded;
   }
@@ -57,11 +55,6 @@ class PersonasNotifier extends StateNotifier<Map<String, String>> {
     state = newState;
     final box = Hive.box('personas');
     box.delete(name);
-  }
-
-  void _saveAll(Map<String, String> personas) {
-    final box = Hive.box('personas');
-    box.putAll(personas);
   }
 }
 
