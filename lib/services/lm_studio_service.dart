@@ -12,11 +12,17 @@ class LmStudioService {
   Stream<String> chatStream({
     required List<ChatMessage> history,
     required String systemPrompt,
+    required String modelId,
     bool enableThinking = true,
   }) async* {
     try {
+      String finalSystemPrompt = systemPrompt;
+      if (!enableThinking) {
+        finalSystemPrompt += "\n\nCRITICAL INSTRUCTION: Do NOT use any reasoning process, internal monologue, or <think> tags. Provide your direct final answer immediately.";
+      }
+
       final messages = [
-        {'role': 'system', 'content': systemPrompt},
+        {'role': 'system', 'content': finalSystemPrompt},
         ...history.map((m) => m.toJson()),
       ];
 
@@ -24,10 +30,11 @@ class LmStudioService {
         '$baseUrl/chat/completions',
         data: {
           'messages': messages,
-          'model': 'google/gemma-4-e4b',
+          'model': modelId,
           'temperature': 0.7,
           'stream': true,
-          'enable_thinking': enableThinking,
+          'include_reasoning': enableThinking,
+          'enable_thinking': enableThinking, // Some versions might use this
         },
         options: Options(
           responseType: ResponseType.stream,
@@ -79,5 +86,18 @@ class LmStudioService {
   static String encodeImage(File imageFile) {
     List<int> imageBytes = imageFile.readAsBytesSync();
     return base64Encode(imageBytes);
+  }
+
+  Future<List<String>> fetchModels() async {
+    try {
+      final response = await _dio.get('$baseUrl/models');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'];
+        return data.map((m) => m['id'].toString()).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
   }
 }

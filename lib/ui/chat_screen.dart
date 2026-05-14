@@ -66,6 +66,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: Icon(
+              ref.watch(showThinkingProvider) ? Icons.psychology : Icons.psychology_outlined,
+              color: ref.watch(showThinkingProvider) ? const Color(0xFF6366F1) : Colors.white24,
+            ),
+            onPressed: () {
+              final newValue = !ref.read(showThinkingProvider);
+              ref.read(showThinkingProvider.notifier).state = newValue;
+              Hive.box('settings').put('enableThinking', newValue);
+            },
+            tooltip: 'Toggle Thinking',
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => _showSettingsDialog(context),
           ),
@@ -89,7 +101,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         child: Column(
           children: [
-            if (currentSession != null) _buildPersonaSelector(currentSession),
+            if (currentSession != null) ...[
+              _buildModelSelector(),
+              _buildPersonaSelector(currentSession),
+            ],
             Expanded(
               child: currentSession == null 
                 ? _buildEmptyState()
@@ -186,9 +201,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   List<Widget> _buildMessageContent(ChatMessage message) {
     final content = message.content;
+    final showThinking = ref.watch(showThinkingProvider);
     
-    // Pattern to match thinking blocks: <think>...</think> or <|channel>thought...<channel|>
-    final thinkRegex = RegExp(r'(?:<\|channel>thought|<think>)([\s\S]*?)(?:<channel\|>|</think>|$)', caseSensitive: false);
+    // Pattern to match thinking blocks: <think>...</think> or <|channel>thought...<channel|> or <thought>...</thought>
+    final thinkRegex = RegExp(r'(?:<\|channel>thought|<think>|<thought>)([\s\S]*?)(?:<channel\|>|</think>|</thought>|$)', caseSensitive: false);
     final match = thinkRegex.firstMatch(content);
 
     if (match != null) {
@@ -524,6 +540,70 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
+  Widget _buildModelSelector() {
+    final availableModels = ref.watch(availableModelsProvider);
+    final selectedModel = ref.watch(selectedModelProvider);
+
+    return availableModels.when(
+      data: (models) {
+        if (models.isEmpty) return const SizedBox.shrink();
+        
+        // Ensure selected model is in the list or set to first available
+        if (selectedModel == null && models.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.read(selectedModelProvider.notifier).state = models.first;
+          });
+        }
+
+        return Container(
+          height: 40,
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              const Icon(Icons.model_training, size: 16, color: Colors.white38),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: models.contains(selectedModel) ? selectedModel : null,
+                    hint: const Text('Select Model', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                    dropdownColor: const Color(0xFF1E293B),
+                    icon: const Icon(Icons.arrow_drop_down, color: Colors.white24),
+                    isExpanded: true,
+                    items: models.map((model) {
+                      return DropdownMenuItem<String>(
+                        value: model,
+                        child: Text(
+                          model,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        ref.read(selectedModelProvider.notifier).state = value;
+                        Hive.box('settings').put('selectedModel', value);
+                      }
+                    },
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 16, color: Colors.white24),
+                onPressed: () => ref.invalidate(availableModelsProvider),
+                tooltip: 'Refresh Models',
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const LinearProgressIndicator(minHeight: 2, color: Color(0xFF6366F1), backgroundColor: Colors.transparent),
+      error: (err, stack) => const SizedBox.shrink(),
+    );
+  }
+
   void _showDeletePersonaDialog(BuildContext context, String name) {
     showDialog(
       context: context,
@@ -667,6 +747,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 onPressed: () {
                   settings.put('baseUrl', controller.text);
                   settings.put('enableThinking', enableThinking);
+                  ref.read(showThinkingProvider.notifier).state = enableThinking;
+                  ref.invalidate(chatServiceProvider);
+                  ref.invalidate(availableModelsProvider);
                   Navigator.pop(context);
                 },
                 child: const Text('Apply'),

@@ -9,7 +9,7 @@ import '../services/lm_studio_service.dart';
 
 final chatServiceProvider = Provider((ref) {
   final settings = Hive.box('settings');
-  final baseUrl = settings.get('baseUrl', defaultValue: 'http://localhost:1234/api/v1/chat');
+  final baseUrl = settings.get('baseUrl', defaultValue: 'http://localhost:1234/v1');
   return LmStudioService(baseUrl: baseUrl);
 });
 
@@ -17,6 +17,21 @@ final currentSessionProvider = StateProvider<ChatSession?>((ref) => null);
 
 final chatSessionsProvider = StateNotifierProvider<ChatSessionsNotifier, List<ChatSession>>((ref) {
   return ChatSessionsNotifier();
+});
+
+final selectedModelProvider = StateProvider<String?>((ref) {
+  final settings = Hive.box('settings');
+  return settings.get('selectedModel');
+});
+
+final availableModelsProvider = FutureProvider<List<String>>((ref) async {
+  final service = ref.read(chatServiceProvider);
+  return await service.fetchModels();
+});
+
+final showThinkingProvider = StateProvider<bool>((ref) {
+  final settings = Hive.box('settings');
+  return settings.get('enableThinking', defaultValue: true);
 });
 
 final personasProvider = StateNotifierProvider<PersonasNotifier, Map<String, String>>((ref) {
@@ -167,11 +182,13 @@ class ChatMessagesNotifier extends StateNotifier<ChatState> {
       final session = box.get(sessionId);
       final settings = Hive.box('settings');
       final enableThinking = settings.get('enableThinking', defaultValue: true);
+      final selectedModel = ref.read(selectedModelProvider) ?? 'google/gemma-4-e4b';
 
       final stream = service.chatStream(
         history: state.messages.sublist(0, state.messages.length - 1),
         systemPrompt: session?.systemPrompt ?? 'You are a helpful assistant.',
         enableThinking: enableThinking,
+        modelId: selectedModel,
       );
 
       String fullContent = '';
@@ -261,11 +278,13 @@ class ChatMessagesNotifier extends StateNotifier<ChatState> {
       final session = box.get(sessionId);
       final settings = Hive.box('settings');
       final enableThinking = settings.get('enableThinking', defaultValue: true);
+      final selectedModel = ref.read(selectedModelProvider) ?? 'google/gemma-4-e4b';
 
       final stream = service.chatStream(
         history: state.messages.sublist(0, state.messages.length - 1),
         systemPrompt: session?.systemPrompt ?? 'You are a helpful assistant.',
         enableThinking: enableThinking,
+        modelId: selectedModel,
       );
 
       String fullContent = '';
